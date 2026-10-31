@@ -52,6 +52,7 @@ static bool hyundai_canfd_angle_steering = false;
 static bool hyundai_canfd_lka_steer_msg_alt = false;
 static uint8_t hyundai_canfd_angle_model_id = HYUNDAI_ANGLE_MODEL_BASELINE;
 static bool hyundai_ccnc = false;
+static bool hyundai_canfd_counter_7bit = false;
 
 static bool get_hyundai_ccnc(void) {
   return hyundai_ccnc;
@@ -65,6 +66,10 @@ static uint8_t hyundai_canfd_get_counter(const CANPacket_t *msg) {
   uint8_t ret = 0;
   if (GET_LEN(msg) == 8U) {
     ret = msg->data[1] >> 4;
+  } else if (hyundai_canfd_counter_7bit && (msg->addr == 0x100U)) {
+    // 7-bit counter at bit 17 (bit 16 is constant). The rx check expects an 8-bit wrap,
+    // so each 127 -> 0 rollover counts as a single wrong counter, well under MAX_WRONG_COUNTERS
+    ret = msg->data[2] >> 1;
   } else {
     ret = msg->data[2];
   }
@@ -279,6 +284,7 @@ static safety_config hyundai_canfd_init(uint16_t param) {
   const uint16_t HYUNDAI_PARAM_CANFD_ALT_BUTTONS = 32;
   const uint16_t HYUNDAI_PARAM_CANFD_ANGLE_STEERING = 1024;
   const uint16_t HYUNDAI_PARAM_CCNC = 2048;
+  const uint16_t HYUNDAI_PARAM_CANFD_COUNTER_7BIT = 4096;
 
   static const CanMsg HYUNDAI_CANFD_LKA_STEER_MSG_TX_MSGS[] = {
     HYUNDAI_CANFD_LKA_STEER_MSG_COMMON_TX_MSGS(0, 1)
@@ -341,6 +347,7 @@ static safety_config hyundai_canfd_init(uint16_t param) {
   // TODO: test this restriction
   hyundai_canfd_lka_steer_msg_alt = GET_FLAG(param, HYUNDAI_PARAM_CANFD_LKA_STEER_MSG_ALT);
   hyundai_ccnc = GET_FLAG(param, HYUNDAI_PARAM_CCNC);
+  hyundai_canfd_counter_7bit = GET_FLAG(param, HYUNDAI_PARAM_CANFD_COUNTER_7BIT);
 
   safety_config ret;
   if (hyundai_longitudinal) {

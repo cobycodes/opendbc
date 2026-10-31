@@ -97,6 +97,8 @@ class CarInterface(CarInterfaceBase):
         ret.safetyConfigs[-1].safetyParam |= HyundaiSafetyFlags.CANFD_ANGLE_STEERING.value
       if ret.flags & HyundaiFlags.CCNC and not ret.flags & HyundaiFlags.CANFD_LKA_STEER_MSG:
         ret.safetyConfigs[-1].safetyParam |= HyundaiSafetyFlags.CCNC.value
+      if DBC[candidate][Bus.pt] == "hyundai_canfd_seltos_generated":
+        ret.safetyConfigs[-1].safetyParam |= HyundaiSafetyFlags.CANFD_COUNTER_7BIT.value
 
     else:
       # Shared configuration for non CAN-FD cars

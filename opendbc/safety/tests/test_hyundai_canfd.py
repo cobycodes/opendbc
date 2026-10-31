@@ -692,5 +692,25 @@ class TestHyundaiCanfdLFASteeringLongCCNC(TestHyundaiCanfdLFASteeringLongBase):
           self.assertFalse(self._tx(make_msg(bus, addr)), f"allowed TX {addr=:#x} {bus=}")
 
 
+class TestHyundaiCanfdLFASteeringCCNCCounter7Bit(TestHyundaiCanfdLFASteeringCCNC):
+  # ACCELERATOR_BRAKE_ALT carries a 7-bit counter at bit 17 (e.g. Kia Seltos 2027)
+  __test__ = True
+  DBC = "hyundai_canfd_seltos_generated"
+  GAS_MSG = ("ACCELERATOR_BRAKE_ALT", "ACCELERATOR_PEDAL_PRESSED")
+  SCC_BUS = 2
+  EXTRA_SAFETY_PARAM = HyundaiSafetyFlags.CAMERA_SCC | HyundaiSafetyFlags.CANFD_COUNTER_7BIT
+
+  def test_counter_7bit_rollover(self):
+    self.safety.set_controls_allowed(True)
+    for _ in range(300):
+      self.assertTrue(self._rx(self._user_gas_msg(0)))
+    self.assertTrue(self.safety.get_controls_allowed())
+
+  def test_counter_7bit_requires_flag(self):
+    self.safety.set_safety_hooks(self.SAFETY_MODEL, self.SAFETY_PARAM & ~HyundaiSafetyFlags.CANFD_COUNTER_7BIT)
+    self.safety.init_tests()
+    self.assertFalse(all(self._rx(self._user_gas_msg(0)) for _ in range(10)))
+
+
 if __name__ == "__main__":
   unittest.main()

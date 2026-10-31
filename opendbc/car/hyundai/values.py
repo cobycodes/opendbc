@@ -90,6 +90,7 @@ class HyundaiSafetyFlags(IntFlag):
   ALT_LIMITS_2 = 512
   CANFD_ANGLE_STEERING = 1024
   CCNC = 2048
+  CANFD_COUNTER_7BIT = 4096
 
 
 # Hyundai/Kia/Genesis SCC (Smart Cruise Control) and steering architecture:
