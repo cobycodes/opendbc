@@ -99,6 +99,8 @@ class CarInterface(CarInterfaceBase):
         ret.safetyConfigs[-1].safetyParam |= HyundaiSafetyFlags.CCNC.value
       if DBC[candidate][Bus.pt] == "hyundai_canfd_seltos_generated":
         ret.safetyConfigs[-1].safetyParam |= HyundaiSafetyFlags.CANFD_COUNTER_7BIT.value
+      if candidate == CAR.KIA_SELTOS_2027:
+        ret.safetyConfigs[-1].safetyParam |= HyundaiSafetyFlags.CANFD_LDA_BUTTON_ALT.value
 
     else:
       # Shared configuration for non CAN-FD cars

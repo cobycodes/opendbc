@@ -692,13 +692,22 @@ class TestHyundaiCanfdLFASteeringLongCCNC(TestHyundaiCanfdLFASteeringLongBase):
           self.assertFalse(self._tx(make_msg(bus, addr)), f"allowed TX {addr=:#x} {bus=}")
 
 
-class TestHyundaiCanfdLFASteeringCCNCCounter7Bit(TestHyundaiCanfdLFASteeringCCNC):
-  # ACCELERATOR_BRAKE_ALT carries a 7-bit counter at bit 17 (e.g. Kia Seltos 2027)
+class TestHyundaiCanfdLFASteeringCCNCSeltos2027(TestHyundaiCanfdLFASteeringCCNC):
+  # ACCELERATOR_BRAKE_ALT carries a 7-bit counter at bit 17, LKAS button is on LDA_BUTTON_ALT
   __test__ = True
   DBC = "hyundai_canfd_seltos_generated"
   GAS_MSG = ("ACCELERATOR_BRAKE_ALT", "ACCELERATOR_PEDAL_PRESSED")
   SCC_BUS = 2
-  EXTRA_SAFETY_PARAM = HyundaiSafetyFlags.CAMERA_SCC | HyundaiSafetyFlags.CANFD_COUNTER_7BIT
+  EXTRA_SAFETY_PARAM = HyundaiSafetyFlags.CAMERA_SCC | HyundaiSafetyFlags.CANFD_COUNTER_7BIT | HyundaiSafetyFlags.CANFD_LDA_BUTTON_ALT
+
+  def _lkas_button_msg(self, enabled):
+    return self.packer.make_can_msg_safety("LDA_BUTTON_ALT", self.PT_BUS, {"LDA_BTN": enabled})
+
+  def test_stock_lda_button_ignored(self):
+    self.safety.set_mads_params(True, False, False)
+    self._rx(super()._lkas_button_msg(True))
+    self._rx(super()._lkas_button_msg(False))
+    self.assertFalse(self.safety.get_controls_allowed_lateral())
 
   def test_counter_7bit_rollover(self):
     self.safety.set_controls_allowed(True)
@@ -706,10 +715,40 @@ class TestHyundaiCanfdLFASteeringCCNCCounter7Bit(TestHyundaiCanfdLFASteeringCCNC
       self.assertTrue(self._rx(self._user_gas_msg(0)))
     self.assertTrue(self.safety.get_controls_allowed())
 
+  def test_lda_button_alt_recorded_frames(self):
+    from opendbc.safety.tests.common import make_msg
+    frames = ["9732bb00000000000000002000000000", "2cf2bd00000000000000002000000000", "45b2bf00000000000000002000000000",
+              "4d8ac100000000000000002000000000", "24cac300000000000000002000000000", "9f0ac500000000000000002000000000"]
+    for frame in frames:
+      self.assertTrue(self._rx(make_msg(self.PT_BUS, 0x10b, 16, bytes.fromhex(frame))))
+
+  def test_lda_button_alt_counter_rollover(self):
+    for _ in range(300):
+      self.assertTrue(self._rx(self._lkas_button_msg(False)))
+
+  def test_lda_button_alt_requires_flag(self):
+    self.safety.set_safety_hooks(self.SAFETY_MODEL, self.SAFETY_PARAM & ~HyundaiSafetyFlags.CANFD_LDA_BUTTON_ALT)
+    self.safety.init_tests()
+    self.safety.set_mads_params(True, False, False)
+    self._rx(self._lkas_button_msg(True))
+    self._rx(self._lkas_button_msg(False))
+    self.assertFalse(self.safety.get_controls_allowed_lateral())
+
   def test_counter_7bit_requires_flag(self):
     self.safety.set_safety_hooks(self.SAFETY_MODEL, self.SAFETY_PARAM & ~HyundaiSafetyFlags.CANFD_COUNTER_7BIT)
     self.safety.init_tests()
     self.assertFalse(all(self._rx(self._user_gas_msg(0)) for _ in range(10)))
+
+
+class TestHyundaiCanfdLFASteeringLongCCNCSeltos2027(TestHyundaiCanfdLFASteeringLongCCNC):
+  __test__ = True
+  DBC = "hyundai_canfd_seltos_generated"
+  GAS_MSG = ("ACCELERATOR_BRAKE_ALT", "ACCELERATOR_PEDAL_PRESSED")
+  SCC_BUS = 2
+  EXTRA_SAFETY_PARAM = HyundaiSafetyFlags.CAMERA_SCC | HyundaiSafetyFlags.CANFD_COUNTER_7BIT | HyundaiSafetyFlags.CANFD_LDA_BUTTON_ALT
+
+  def _lkas_button_msg(self, enabled):
+    return self.packer.make_can_msg_safety("LDA_BUTTON_ALT", self.PT_BUS, {"LDA_BTN": enabled})
 
 
 if __name__ == "__main__":

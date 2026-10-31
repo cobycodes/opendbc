@@ -1,14 +1,22 @@
 #!/usr/bin/env python3
 # 2027 Kia Seltos uses the standard hyundai_canfd pt DBC, except GEAR_ALT (0x40) and
 # ACCELERATOR_BRAKE_ALT (0x100) carry a 7-bit counter at bit17 (bit16 is a constant flag),
-# not the shared 8-bit COUNTER at bit16. Derive a Seltos pt DBC that only patches those two,
-# so the shared DBC (every other HKG CAN-FD car) is untouched.
+# not the shared 8-bit COUNTER at bit16. Derive a Seltos pt DBC that only patches those two
+# and adds the Seltos LKAS button message, so the shared DBC (every other HKG CAN-FD car) is untouched.
 import os
 
 # messages whose COUNTER is 7-bit @ bit17 on this platform
 PATCH_MSGS = {"64", "256"}
 OLD = " SG_ COUNTER : 16|8@1+ (1,0) [0|255] \"\" XXX"
 NEW = " SG_ COUNTER : 17|7@1+ (1,0) [0|127] \"\" XXX"
+
+# steering wheel LKAS button; CRUISE_BUTTONS LDA_BTN never changes on this platform
+EXTRA_MSGS = """BO_ 267 LDA_BUTTON_ALT: 16 XXX
+ SG_ CHECKSUM : 0|16@1+ (1,0) [0|65535] "" XXX
+ SG_ COUNTER : 17|7@1+ (1,0) [0|127] "" XXX
+ SG_ LDA_BTN : 87|1@1+ (1,0) [0|1] "" XXX
+
+"""
 
 
 def generate() -> dict[str, str]:
@@ -20,6 +28,8 @@ def generate() -> dict[str, str]:
   for line in lines:
     s = line.strip()
     if s.startswith("BO_ "):
+      if cur is None:
+        out.append(EXTRA_MSGS)
       cur = s.split()[1]
     if cur in PATCH_MSGS and line.rstrip("\n") == OLD:
       line = NEW + ("\n" if line.endswith("\n") else "")
