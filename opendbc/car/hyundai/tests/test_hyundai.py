@@ -1,12 +1,13 @@
 import unittest
 
-from opendbc.car import gen_empty_fingerprint
+from opendbc.can import CANPacker
+from opendbc.car import Bus, CanData, gen_empty_fingerprint
 from opendbc.car.structs import CarParams
 from opendbc.car.fw_versions import build_fw_dict
 from opendbc.car.hyundai.interface import CarInterface
 from opendbc.car.hyundai.hyundaicanfd import CanBus
 from opendbc.car.hyundai.radar_interface import RADAR_START_ADDR
-from opendbc.car.hyundai.values import CAR, DATE_FW_ECUS, \
+from opendbc.car.hyundai.values import CAR, DBC, DATE_FW_ECUS, \
                                          FW_QUERY_CONFIG, CANFD_FUZZY_WHITELIST, \
                                          PLATFORM_CODE_ECUS, HYUNDAI_VERSION_REQUEST_LONG, \
                                          HyundaiFlags, get_platform_codes, HyundaiSafetyFlags, \
@@ -77,6 +78,38 @@ class TestHyundaiFingerprint(unittest.TestCase):
         fingerprint[1][RADAR_START_ADDR] = 8
       CP = CarInterface.get_params(CAR.HYUNDAI_SONATA, fingerprint, [], False, False, False)
       assert CP.radarUnavailable != radar
+
+  def test_seltos_2027_blinkers(self):
+    fingerprint = gen_empty_fingerprint()
+    CP = CarInterface.get_params(CAR.KIA_SELTOS_2027, fingerprint, [], False, False, False)
+    CP_SP = CarInterface.get_params_sp(CP, CAR.KIA_SELTOS_2027, fingerprint, [], False, False, False)
+    CI = CarInterface(CP, CP_SP)
+    packer = CANPacker(DBC[CP.carFingerprint][Bus.pt])
+    ecan = CanBus(CP).ECAN
+    CI.update([])  # signals are registered with the parser on first access
+
+    # (stalk, light status, TURN_SIGNAL) as recorded on a 2027 Seltos, BLINKERS_NEW is only sent on change
+    sequences = {
+      "tap": [((1, 1, 1), True), ((0, 1, 1), True), ((0, 1, 1), True), ((0, 0, 0), False)],
+      "hold": [((1, 1, 1), True), ((1, 1, 1), True), ((0, 1, 1), True), ((0, 0, 0), False)],
+    }
+    t = 0
+    for side, other in (("LEFT", "RIGHT"), ("RIGHT", "LEFT")):
+      for name, steps in sequences.items():
+        for (stalk, status, turn_signal), expected in steps:
+          values = {f"{side}_STALK": stalk, f"{side}_LIGHT_STATUS": status, "TURN_SIGNAL": turn_signal}
+          addr, dat, _ = packer.make_can_msg("BLINKERS_NEW", ecan, values)
+          t += 450_000_000
+          CS, _ = CI.update([(t, [CanData(addr, dat, ecan)])])
+          assert getattr(CS, f"{side.lower()}Blinker") == expected, (side, name, values)
+          assert not getattr(CS, f"{other.lower()}Blinker"), (side, name, values)
+
+    # hazards: both lights flash without TURN_SIGNAL
+    for status in (1, 0):
+      addr, dat, _ = packer.make_can_msg("BLINKERS_NEW", ecan, {"LEFT_LIGHT_STATUS": status, "RIGHT_LIGHT_STATUS": status})
+      t += 450_000_000
+      CS, _ = CI.update([(t, [CanData(addr, dat, ecan)])])
+      assert not CS.leftBlinker and not CS.rightBlinker
 
   def test_alternate_limits(self):
     # Alternate lateral control limits, for high torque cars, verify Panda safety mode flag is set

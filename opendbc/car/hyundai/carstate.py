@@ -282,9 +282,11 @@ class CarState(CarStateBase, EsccCarStateBase, MadsCarState, CarStateExt):
       self.msg_161, self.msg_162, self.msg_1b5 = map(copy.copy, (cp_cam.vl["CCNC_0x161"], cp_cam.vl["CCNC_0x162"], cp_cam.vl["FR_CMR_03_50ms"]))
       self.cruise_info = copy.copy((cp_cam if self.CP.flags & HyundaiFlags.CANFD_CAMERA_SCC else cp).vl["SCC_CONTROL"])
     if self.CP.carFingerprint == CAR.KIA_SELTOS_2027:
-      # stalk position (not lamp) so hazards don't register as a blinker
-      ret.leftBlinker = cp.vl["BLINKERS_NEW"]["LEFT_STALK"] == 1
-      ret.rightBlinker = cp.vl["BLINKERS_NEW"]["RIGHT_STALK"] == 1
+      # LIGHT_STATUS stays set for the whole one-touch (tap) flash sequence, unlike the stalk.
+      # TURN_SIGNAL is set for turn signals but not hazards
+      turn_signal = cp.vl["BLINKERS_NEW"]["TURN_SIGNAL"] == 1
+      ret.leftBlinker = turn_signal and cp.vl["BLINKERS_NEW"]["LEFT_LIGHT_STATUS"] == 1
+      ret.rightBlinker = turn_signal and cp.vl["BLINKERS_NEW"]["RIGHT_LIGHT_STATUS"] == 1
     else:
       ret.leftBlinker, ret.rightBlinker = self.update_blinker_from_lamp(50, cp.vl["BLINKERS"][left_blinker_sig],
                                                                         cp.vl["BLINKERS"][right_blinker_sig])
