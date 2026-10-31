@@ -387,6 +387,11 @@ static safety_config hyundai_canfd_init(uint16_t param) {
         HYUNDAI_CANFD_LDA_BUTTON_ALT_RX_CHECK(0)
       };
 
+      static RxCheck hyundai_canfd_alt_buttons_lda_button_alt_long_rx_checks[] = {
+        HYUNDAI_CANFD_ALT_BUTTONS_RX_CHECKS(0)
+        HYUNDAI_CANFD_LDA_BUTTON_ALT_RX_CHECK(0)
+      };
+
       static CanMsg hyundai_canfd_lfa_steering_camera_scc_tx_msgs[] = {
         HYUNDAI_CANFD_LFA_STEERING_CAMERA_SCC_TX_MSGS(true)
       };
@@ -395,10 +400,14 @@ static safety_config hyundai_canfd_init(uint16_t param) {
         HYUNDAI_CANFD_LFA_STEERING_CAMERA_SCC_CCNC_TX_MSGS(true)
       };
 
-      if (hyundai_canfd_alt_buttons) {
+      if (hyundai_canfd_lda_button_alt) {
+        if (hyundai_canfd_alt_buttons) {
+          SET_RX_CHECKS(hyundai_canfd_alt_buttons_lda_button_alt_long_rx_checks, ret);
+        } else {
+          SET_RX_CHECKS(hyundai_canfd_lda_button_alt_long_rx_checks, ret);
+        }
+      } else if (hyundai_canfd_alt_buttons) {
         SET_RX_CHECKS(hyundai_canfd_alt_buttons_long_rx_checks, ret);
-      } else if (hyundai_canfd_lda_button_alt) {
-        SET_RX_CHECKS(hyundai_canfd_lda_button_alt_long_rx_checks, ret);
       } else {
         SET_RX_CHECKS(hyundai_canfd_long_rx_checks, ret);
       }
@@ -468,6 +477,12 @@ static safety_config hyundai_canfd_init(uint16_t param) {
         HYUNDAI_CANFD_SCC_ADDR_CHECK(2)
       };
 
+      static RxCheck hyundai_canfd_alt_buttons_lda_button_alt_rx_checks[] = {
+        HYUNDAI_CANFD_ALT_BUTTONS_RX_CHECKS(0)
+        HYUNDAI_CANFD_LDA_BUTTON_ALT_RX_CHECK(0)
+        HYUNDAI_CANFD_SCC_ADDR_CHECK(2)
+      };
+
       static CanMsg hyundai_canfd_lfa_steering_camera_scc_tx_msgs[] = {
         HYUNDAI_CANFD_LFA_STEERING_CAMERA_SCC_TX_MSGS(false)
       };
@@ -482,10 +497,14 @@ static safety_config hyundai_canfd_init(uint16_t param) {
         SET_TX_MSGS(hyundai_canfd_lfa_steering_camera_scc_tx_msgs, ret);
       }
 
-      if (hyundai_canfd_alt_buttons) {
+      if (hyundai_canfd_lda_button_alt) {
+        if (hyundai_canfd_alt_buttons) {
+          SET_RX_CHECKS(hyundai_canfd_alt_buttons_lda_button_alt_rx_checks, ret);
+        } else {
+          SET_RX_CHECKS(hyundai_canfd_lda_button_alt_rx_checks, ret);
+        }
+      } else if (hyundai_canfd_alt_buttons) {
         SET_RX_CHECKS(hyundai_canfd_alt_buttons_rx_checks, ret);
-      } else if (hyundai_canfd_lda_button_alt) {
-        SET_RX_CHECKS(hyundai_canfd_lda_button_alt_rx_checks, ret);
       } else {
         SET_RX_CHECKS(hyundai_canfd_rx_checks, ret);
       }

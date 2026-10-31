@@ -726,6 +726,16 @@ class TestHyundaiCanfdLFASteeringCCNCSeltos2027(TestHyundaiCanfdLFASteeringCCNC)
     for _ in range(300):
       self.assertTrue(self._rx(self._lkas_button_msg(False)))
 
+  def test_lda_button_alt_with_alt_buttons(self):
+    self.safety.set_safety_hooks(self.SAFETY_MODEL, self.SAFETY_PARAM | HyundaiSafetyFlags.CANFD_ALT_BUTTONS)
+    self.safety.init_tests()
+    self.safety.set_mads_params(True, False, False)
+    self.assertTrue(self._rx(self.packer.make_can_msg_safety("CRUISE_BUTTONS_ALT", self.PT_BUS, {"LDA_BTN": 1})))
+    self.assertFalse(self.safety.get_controls_allowed_lateral())
+    self._rx(self._lkas_button_msg(True))
+    self._rx(self._lkas_button_msg(False))
+    self.assertTrue(self.safety.get_controls_allowed_lateral())
+
   def test_lda_button_alt_requires_flag(self):
     self.safety.set_safety_hooks(self.SAFETY_MODEL, self.SAFETY_PARAM & ~HyundaiSafetyFlags.CANFD_LDA_BUTTON_ALT)
     self.safety.init_tests()
