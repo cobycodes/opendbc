@@ -27,6 +27,7 @@ enum {
   HYUNDAI_ANGLE_MODEL_KIA_SORENTO_HEV_4TH_LFA2, // 8
   HYUNDAI_ANGLE_MODEL_GENESIS_GV70_E_2ND_GEN,    // 9
   HYUNDAI_ANGLE_MODEL_HYUNDAI_AZERA_HEV_7TH,     // 10
+  HYUNDAI_ANGLE_MODEL_KIA_SELTOS_2027,           // 11
 
   HYUNDAI_ANGLE_MODEL_COUNT,  // must be last — used for bounds checking
 };
@@ -126,6 +127,13 @@ static const AngleSteeringParams *hyundai_get_angle_params(uint8_t model_id) {
       .slip_factor = -0.0005793721359940619,
       .steer_ratio = 13.5,
       .wheelbase = 2.895,
+    },
+
+    // [11] KIA_SELTOS_2027 — wb=2.69, sr=13.6
+    [HYUNDAI_ANGLE_MODEL_KIA_SELTOS_2027] = {
+      .slip_factor = -0.000623524963315287,
+      .steer_ratio = 13.6,
+      .wheelbase = 2.69,
     },
   };
   // const AngleSteeringParams *result_model;
