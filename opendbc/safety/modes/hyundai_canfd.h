@@ -43,7 +43,7 @@
   HYUNDAI_CANFD_COMMON_RX_CHECKS(pt_bus)                                                                                                         \
   {.msg = {{0x1aa, (pt_bus), 16, 50U, .ignore_checksum = true, .max_counter = 0xffU, .ignore_quality_flag = true}, { 0 }, { 0 }}},  \
 
-// LKAS button on platforms where CRUISE_BUTTONS LDA_BTN is unused (Kia Seltos 2027)
+// steering wheel cruise + LKAS buttons on platforms where the CRUISE_BUTTONS messages don't carry them (Kia Seltos 2027)
 #define HYUNDAI_CANFD_LDA_BUTTON_ALT_RX_CHECK(pt_bus)                                                                    \
   {.msg = {{0x10b, (pt_bus), 16, 25U, .ignore_checksum = true, .max_counter = 0xffU, .ignore_quality_flag = true}, { 0 }, { 0 }}},  \
 
@@ -102,7 +102,10 @@ static void hyundai_canfd_rx_hook(const CANPacket_t *msg) {
   }
 
   // cruise buttons
-  const unsigned int button_addr = hyundai_canfd_alt_buttons ? 0x1aaU : 0x1cfU;
+  unsigned int button_addr = hyundai_canfd_alt_buttons ? 0x1aaU : 0x1cfU;
+  if (hyundai_canfd_lda_button_alt) {
+    button_addr = 0x10bU;
+  }
   if (msg_matches(msg, button_addr, pt_bus)) {
     bool main_button = false;
     int cruise_button = 0;
@@ -111,19 +114,18 @@ static void hyundai_canfd_rx_hook(const CANPacket_t *msg) {
       cruise_button = msg->data[2] & 0x7U;
       main_button = GET_BIT(msg, 19U);
       mads_button = GET_BIT(msg, 23U);
+    } else if (msg_matches(msg, 0x10bU, pt_bus)) {
+      // same layout as 0x1cf, shifted by 8 bytes
+      cruise_button = msg->data[10] & 0x7U;
+      main_button = GET_BIT(msg, 83U);
+      mads_button = GET_BIT(msg, 87U);
     } else {
       cruise_button = (msg->data[4] >> 4) & 0x7U;
       main_button = GET_BIT(msg, 34U);
       mads_button = GET_BIT(msg, 39U);
     }
-    if (!hyundai_canfd_lda_button_alt) {
-      mads_button_press = mads_button ? MADS_BUTTON_PRESSED : MADS_BUTTON_NOT_PRESSED;
-    }
+    mads_button_press = mads_button ? MADS_BUTTON_PRESSED : MADS_BUTTON_NOT_PRESSED;
     hyundai_common_cruise_buttons_check(cruise_button, main_button);
-  }
-
-  if (hyundai_canfd_lda_button_alt && msg_matches(msg, 0x10bU, pt_bus)) {
-    mads_button_press = GET_BIT(msg, 87U) ? MADS_BUTTON_PRESSED : MADS_BUTTON_NOT_PRESSED;
   }
 
   // gas press, different for EV, hybrid, and ICE models

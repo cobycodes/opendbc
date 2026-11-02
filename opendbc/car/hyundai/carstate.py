@@ -318,12 +318,11 @@ class CarState(CarStateBase, EsccCarStateBase, MadsCarState, CarStateExt):
     prev_cruise_buttons = self.cruise_buttons[-1]
     prev_main_buttons = self.main_buttons[-1]
     prev_lda_button = self.lda_button
-    self.cruise_buttons.extend(cp.vl_all[self.cruise_btns_msg_canfd]["CRUISE_BUTTONS"])
-    self.main_buttons.extend(cp.vl_all[self.cruise_btns_msg_canfd]["ADAPTIVE_CRUISE_MAIN_BTN"])
-    if self.CP.carFingerprint == CAR.KIA_SELTOS_2027:
-      self.lda_button = cp.vl["LDA_BUTTON_ALT"]["LDA_BTN"]
-    else:
-      self.lda_button = cp.vl[self.cruise_btns_msg_canfd]["LDA_BTN"]
+    # steering wheel buttons on the 2027 Seltos are in LDA_BUTTON_ALT, CRUISE_BUTTONS_ALT never changes
+    btns_msg = "LDA_BUTTON_ALT" if self.CP.carFingerprint == CAR.KIA_SELTOS_2027 else self.cruise_btns_msg_canfd
+    self.cruise_buttons.extend(cp.vl_all[btns_msg]["CRUISE_BUTTONS"])
+    self.main_buttons.extend(cp.vl_all[btns_msg]["ADAPTIVE_CRUISE_MAIN_BTN"])
+    self.lda_button = cp.vl[btns_msg]["LDA_BTN"]
     self.buttons_counter = cp.vl[self.cruise_btns_msg_canfd]["COUNTER"]
     ret.accFaulted = cp.vl["TCS"]["ACCEnable"] != 0  # 0 ACC CONTROL ENABLED, 1-3 ACC CONTROL DISABLED
 

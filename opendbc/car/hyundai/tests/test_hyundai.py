@@ -1,7 +1,7 @@
 import unittest
 
 from opendbc.can import CANPacker
-from opendbc.car import Bus, CanData, gen_empty_fingerprint
+from opendbc.car import Bus, CanData, gen_empty_fingerprint, structs
 from opendbc.car.structs import CarParams
 from opendbc.car.fw_versions import build_fw_dict
 from opendbc.car.hyundai.interface import CarInterface
@@ -16,6 +16,7 @@ from opendbc.car.hyundai.fingerprints import FW_VERSIONS
 from opendbc.testing import fuzzy_test
 
 Ecu = CarParams.Ecu
+ButtonType = structs.CarState.ButtonEvent.Type
 
 # Some platforms have date codes in a different format we don't yet parse (or are missing).
 # For now, assert list of expected missing date cars
@@ -110,6 +111,37 @@ class TestHyundaiFingerprint(unittest.TestCase):
       t += 450_000_000
       CS, _ = CI.update([(t, [CanData(addr, dat, ecan)])])
       assert not CS.leftBlinker and not CS.rightBlinker
+
+  def test_seltos_2027_cruise_buttons(self):
+    fingerprint = gen_empty_fingerprint()
+    CP = CarInterface.get_params(CAR.KIA_SELTOS_2027, fingerprint, [], False, False, False)
+    CP_SP = CarInterface.get_params_sp(CP, CAR.KIA_SELTOS_2027, fingerprint, [], False, False, False)
+    CI = CarInterface(CP, CP_SP)
+    packer = CANPacker(DBC[CP.carFingerprint][Bus.pt])
+    ecan = CanBus(CP).ECAN
+    CI.update([])  # signals are registered with the parser on first access
+
+    t = 0
+
+    def send(msg, values):
+      nonlocal t
+      t += 40_000_000
+      addr, dat, _ = packer.make_can_msg(msg, ecan, values)
+      return CI.update([(t, [CanData(addr, dat, ecan)])])[0]
+
+    # CRUISE_BUTTONS_ALT never carries the buttons on this platform
+    assert send("CRUISE_BUTTONS_ALT", {"CRUISE_BUTTONS": 2}).blockPcmEnable
+    for _ in range(10):
+      send("LDA_BUTTON_ALT", {})
+
+    CS = send("LDA_BUTTON_ALT", {"CRUISE_BUTTONS": 2})
+    assert not CS.blockPcmEnable
+    assert any(be.type == ButtonType.decelCruise and be.pressed for be in CS.buttonEvents)
+    CS = send("LDA_BUTTON_ALT", {"ADAPTIVE_CRUISE_MAIN_BTN": 1})
+    assert any(be.type == ButtonType.mainCruise and be.pressed for be in CS.buttonEvents)
+    for _ in range(10):
+      CS = send("LDA_BUTTON_ALT", {})
+    assert CS.blockPcmEnable
 
   def test_alternate_limits(self):
     # Alternate lateral control limits, for high torque cars, verify Panda safety mode flag is set

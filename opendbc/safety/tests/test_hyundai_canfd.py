@@ -10,7 +10,7 @@ from opendbc.car.structs import CarParams
 from opendbc.car.vehicle_model import VehicleModel, calc_slip_factor
 import opendbc.safety.tests.common as common
 from opendbc.safety.tests.common import away_round, round_speed
-from opendbc.safety.tests.hyundai_common import HyundaiButtonBase, HyundaiLongitudinalBase
+from opendbc.safety.tests.hyundai_common import Buttons, HyundaiButtonBase, HyundaiLongitudinalBase
 from opendbc.car.lateral import get_max_angle_delta_vm, get_max_angle_vm, AngleSteeringLimitsVM
 from opendbc.car.hyundai.interface import CarInterface
 
@@ -692,21 +692,56 @@ class TestHyundaiCanfdLFASteeringLongCCNC(TestHyundaiCanfdLFASteeringLongBase):
           self.assertFalse(self._tx(make_msg(bus, addr)), f"allowed TX {addr=:#x} {bus=}")
 
 
-class TestHyundaiCanfdLFASteeringCCNCSeltos2027(TestHyundaiCanfdLFASteeringCCNC):
-  # ACCELERATOR_BRAKE_ALT carries a 7-bit counter at bit 17, LKAS button is on LDA_BUTTON_ALT
+class Seltos2027ButtonsMixin:
+  # steering wheel buttons are received on LDA_BUTTON_ALT, button sends still use the stock message
+  def _button_msg(self, buttons, main_button=0, bus=None):
+    if bus is not None:
+      return super()._button_msg(buttons, main_button, bus)
+    values = {"CRUISE_BUTTONS": buttons, "ADAPTIVE_CRUISE_MAIN_BTN": main_button}
+    return self.packer.make_can_msg_safety("LDA_BUTTON_ALT", self.PT_BUS, values)
+
+  def _lkas_button_msg(self, enabled):
+    return self.packer.make_can_msg_safety("LDA_BUTTON_ALT", self.PT_BUS, {"LDA_BTN": enabled})
+
+
+class TestHyundaiCanfdLFASteeringCCNCSeltos2027(Seltos2027ButtonsMixin, TestHyundaiCanfdLFASteeringCCNC):
+  # ACCELERATOR_BRAKE_ALT carries a 7-bit counter at bit 17, steering wheel buttons are on LDA_BUTTON_ALT
   __test__ = True
   DBC = "hyundai_canfd_seltos_generated"
   GAS_MSG = ("ACCELERATOR_BRAKE_ALT", "ACCELERATOR_PEDAL_PRESSED")
   SCC_BUS = 2
   EXTRA_SAFETY_PARAM = HyundaiSafetyFlags.CAMERA_SCC | HyundaiSafetyFlags.CANFD_COUNTER_7BIT | HyundaiSafetyFlags.CANFD_LDA_BUTTON_ALT
 
-  def _lkas_button_msg(self, enabled):
-    return self.packer.make_can_msg_safety("LDA_BUTTON_ALT", self.PT_BUS, {"LDA_BTN": enabled})
+  def test_stock_cruise_buttons_ignored(self):
+    for alt_buttons in (False, True):
+      param = self.SAFETY_PARAM | (HyundaiSafetyFlags.CANFD_ALT_BUTTONS if alt_buttons else 0)
+      self.safety.set_safety_hooks(self.SAFETY_MODEL, param)
+      self.safety.init_tests()
+      stock_msg = "CRUISE_BUTTONS_ALT" if alt_buttons else "CRUISE_BUTTONS"
+      self._rx(self.packer.make_can_msg_safety(stock_msg, self.PT_BUS, {"CRUISE_BUTTONS": Buttons.SET}))
+      self._rx(self._pcm_status_msg(True))
+      self.assertFalse(self.safety.get_controls_allowed())
+
+      self._rx(self._pcm_status_msg(False))
+      self._rx(self._button_msg(Buttons.SET))
+      self._rx(self._pcm_status_msg(True))
+      self.assertTrue(self.safety.get_controls_allowed())
+
+  def test_buttons_raw_bits(self):
+    from opendbc.safety.tests.common import make_msg
+    # recorded idle frame with byte 10 set as captured: RES bit 80, SET bit 81, CANCEL bit 82, MAIN bit 83
+    for byte10 in (0x01, 0x02, 0x04, 0x08):
+      self.safety.init_tests()
+      dat = bytearray.fromhex("9732bb00000000000000002000000000")
+      dat[10] = byte10
+      self.assertTrue(self._rx(make_msg(self.PT_BUS, 0x10b, 16, bytes(dat))))
+      self._rx(self._pcm_status_msg(True))
+      self.assertTrue(self.safety.get_controls_allowed(), hex(byte10))
 
   def test_stock_lda_button_ignored(self):
     self.safety.set_mads_params(True, False, False)
-    self._rx(super()._lkas_button_msg(True))
-    self._rx(super()._lkas_button_msg(False))
+    for enabled in (True, False):
+      self._rx(self.packer.make_can_msg_safety("CRUISE_BUTTONS", self.PT_BUS, {"LDA_BTN": enabled}))
     self.assertFalse(self.safety.get_controls_allowed_lateral())
 
   def test_counter_7bit_rollover(self):
@@ -750,15 +785,12 @@ class TestHyundaiCanfdLFASteeringCCNCSeltos2027(TestHyundaiCanfdLFASteeringCCNC)
     self.assertFalse(all(self._rx(self._user_gas_msg(0)) for _ in range(10)))
 
 
-class TestHyundaiCanfdLFASteeringLongCCNCSeltos2027(TestHyundaiCanfdLFASteeringLongCCNC):
+class TestHyundaiCanfdLFASteeringLongCCNCSeltos2027(Seltos2027ButtonsMixin, TestHyundaiCanfdLFASteeringLongCCNC):
   __test__ = True
   DBC = "hyundai_canfd_seltos_generated"
   GAS_MSG = ("ACCELERATOR_BRAKE_ALT", "ACCELERATOR_PEDAL_PRESSED")
   SCC_BUS = 2
   EXTRA_SAFETY_PARAM = HyundaiSafetyFlags.CAMERA_SCC | HyundaiSafetyFlags.CANFD_COUNTER_7BIT | HyundaiSafetyFlags.CANFD_LDA_BUTTON_ALT
-
-  def _lkas_button_msg(self, enabled):
-    return self.packer.make_can_msg_safety("LDA_BUTTON_ALT", self.PT_BUS, {"LDA_BTN": enabled})
 
 
 if __name__ == "__main__":

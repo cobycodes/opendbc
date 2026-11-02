@@ -2,7 +2,7 @@
 # 2027 Kia Seltos uses the standard hyundai_canfd pt DBC, except GEAR_ALT (0x40) and
 # ACCELERATOR_BRAKE_ALT (0x100) carry a 7-bit counter at bit17 (bit16 is a constant flag),
 # not the shared 8-bit COUNTER at bit16. Derive a Seltos pt DBC that only patches those two
-# and adds the Seltos LKAS button message, so the shared DBC (every other HKG CAN-FD car) is untouched.
+# and adds the Seltos steering wheel button message, so the shared DBC (every other HKG CAN-FD car) is untouched.
 import os
 
 # messages whose COUNTER is 7-bit @ bit17 on this platform
@@ -10,10 +10,13 @@ PATCH_MSGS = {"64", "256"}
 OLD = " SG_ COUNTER : 16|8@1+ (1,0) [0|255] \"\" XXX"
 NEW = " SG_ COUNTER : 17|7@1+ (1,0) [0|127] \"\" XXX"
 
-# steering wheel LKAS button; CRUISE_BUTTONS LDA_BTN never changes on this platform
+# steering wheel cruise + LKAS buttons, same layout as CRUISE_BUTTONS shifted by 8 bytes;
+# CRUISE_BUTTONS_ALT never changes on this platform
 EXTRA_MSGS = """BO_ 267 LDA_BUTTON_ALT: 16 XXX
  SG_ CHECKSUM : 0|16@1+ (1,0) [0|65535] "" XXX
  SG_ COUNTER : 17|7@1+ (1,0) [0|127] "" XXX
+ SG_ CRUISE_BUTTONS : 80|3@1+ (1,0) [0|4] "" XXX
+ SG_ ADAPTIVE_CRUISE_MAIN_BTN : 83|1@1+ (1,0) [0|1] "" XXX
  SG_ LDA_BTN : 87|1@1+ (1,0) [0|1] "" XXX
 
 """
